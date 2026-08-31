@@ -1,0 +1,194 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userData() {
+      return get(userPath()).data;
+    }
+
+    function isActiveStaff() {
+      return signedIn() && exists(userPath()) && userData().status == 'ACTIVE';
+    }
+
+    function role() {
+      return userData().role;
+    }
+
+    function roleIn(roles) {
+      return isActiveStaff() && role() in roles;
+    }
+
+    function canManageStaff() {
+      return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER']);
+    }
+
+    function canWriteCatalog() {
+      return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'INVENTORY_STAFF', 'PURCHASING']);
+    }
+
+    function canWriteSales() {
+      return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'CASHIER', 'EMPLOYEE']);
+    }
+
+    function canWriteFinance() {
+      return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT']);
+    }
+
+    function canWriteSettings() {
+      return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER']);
+    }
+
+    match /settings/bootstrap {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.ownerRegistered == true
+        && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /settings/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings() || (id == 'demo' && canManageStaff());
+    }
+
+    match /users/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isActiveStaff());
+      allow list: if isActiveStaff();
+      allow create: if signedIn() && (
+        (
+          request.auth.uid == userId
+          && request.resource.data.role == 'SUPER_ADMIN'
+          && request.resource.data.status == 'ACTIVE'
+          && !exists(/databases/$(database)/documents/settings/bootstrap)
+        )
+        || (
+          canManageStaff()
+          && request.resource.data.role in ['ADMIN', 'MANAGER', 'EMPLOYEE', 'CASHIER', 'INVENTORY_STAFF', 'PURCHASING', 'SUPPLIER', 'ACCOUNTANT']
+        )
+      );
+      allow update: if canManageStaff() || (
+        signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.permissions == resource.data.permissions
+      );
+      allow delete: if false;
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isActiveStaff();
+      allow create: if signedIn() && (
+        (
+          request.resource.data.role == 'SUPER_ADMIN'
+          && request.resource.data.userId == request.auth.uid
+          && !exists(/databases/$(database)/documents/settings/bootstrap)
+        )
+        || canManageStaff()
+      );
+      allow update: if canManageStaff();
+      allow delete: if roleIn(['SUPER_ADMIN']);
+    }
+
+    match /stores/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings();
+    }
+
+    match /permissions/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings();
+    }
+
+    match /rolePermissions/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings();
+    }
+
+    match /userPermissions/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings();
+    }
+
+    match /counters/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canManageStaff();
+    }
+
+    match /products/{id} {
+      allow read: if isActiveStaff();
+      allow create, delete: if canWriteCatalog();
+      allow update: if canWriteCatalog() || (
+        canWriteSales()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentStock', 'updatedAt'])
+      );
+    }
+
+    match /categories/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteCatalog();
+    }
+
+    match /suppliers/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteCatalog();
+    }
+
+    match /customers/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSales() || canManageStaff();
+    }
+
+    match /inventoryTransactions/{id} {
+      allow read: if isActiveStaff();
+      allow create: if canWriteCatalog() || canWriteSales();
+      allow update, delete: if false;
+    }
+
+    match /sales/{id} {
+      allow read: if isActiveStaff();
+      allow create: if canWriteSales();
+      allow update: if canWriteSales();
+      allow delete: if false;
+    }
+
+    match /purchases/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteCatalog();
+    }
+
+    match /expenses/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteFinance();
+    }
+
+    match /cashSessions/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteFinance() || canWriteSales();
+    }
+
+    match /notifications/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canManageStaff();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if canManageStaff();
+      allow create: if isActiveStaff();
+      allow update, delete: if false;
+    }
+
+    match /roles/{id} {
+      allow read: if isActiveStaff();
+      allow write: if canWriteSettings();
+    }
+  }
+}

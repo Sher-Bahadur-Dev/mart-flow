@@ -23,8 +23,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-into committing if needed)
+# env files
 .env*
+!.env.example
 
 # typescript
 *.tsbuildinfo

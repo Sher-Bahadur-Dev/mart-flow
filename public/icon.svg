@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" role="img" aria-label="MartFlow">
+  <title>MartFlow</title>
+  <g transform="translate(0 8)">
+    <rect x="1" y="18" width="17" height="3.4" fill="#00235B"/>
+    <rect x="4" y="27.2" width="14" height="3.4" fill="#00235B"/>
+    <rect x="8" y="36.4" width="10" height="3.4" fill="#00235B"/>
+    <path fill="#00235B" d="M20 60V19.5L34.5 5.5 41 17.5v7.5L34 32.5V60H20Z"/>
+    <path fill="#00B68D" d="M45.5 60V32.5L38.5 25V17.5L45 5.5 60 19.5V60H45.5Z"/>
+    <path d="M34 33.5c5.5-10 11-10 16.5 0" fill="none" stroke="#00B68D" stroke-width="6.2" stroke-linecap="round"/>
+  </g>
+</svg>
