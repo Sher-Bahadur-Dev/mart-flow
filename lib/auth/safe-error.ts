@@ -22,6 +22,8 @@ export function publicAuthError(error: unknown) {
     lower.includes("too many") ||
     lower.includes("password") ||
     lower.includes("username") ||
+    lower.includes("google") ||
+    lower.includes("no store account") ||
     lower.includes("authentication failed")
   ) {
     return message;

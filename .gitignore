@@ -3,5 +3,6 @@
 *.pem
 *firebase-adminsdk*.json
 serviceAccount.json
+.firebase
 node_modules
 !.env.example

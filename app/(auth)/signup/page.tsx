@@ -12,8 +12,8 @@ export default function SignupPage() {
       <div className="mb-6 space-y-1">
         <h1 className="text-xl font-semibold tracking-tight">Create your store</h1>
         <p className="text-sm text-muted-foreground">
-          Fill in your details to create a new Owner account. Passwords are hashed
-          and never shown again.
+          Create an Owner account with email and password, or continue with Google.
+          Firebase Authentication stores credentials. MartFlow never saves passwords.
         </p>
       </div>
       <SignupForm />

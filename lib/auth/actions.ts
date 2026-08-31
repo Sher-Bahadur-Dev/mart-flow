@@ -32,7 +32,11 @@ async function finishSuccessfulLogin(
       storeId: profile.storeId,
       metadata: { ...metadata, reason: "inactive" },
     });
-    throw new Error("Invalid email, username, or password.");
+    throw new Error(
+      metadata.provider === "google"
+        ? "This account is disabled."
+        : "Invalid email, username, or password.",
+    );
   }
 
   await createSession(profile.id);
@@ -120,26 +124,6 @@ export async function login(
       return { error: "Invalid email, username, or password." };
     }
 
-    const store = profile.storeId ? await getStore(profile.storeId) : null;
-    if (!profile.isActive || store?.isActive === false) {
-      await writeAuditLog({
-        action: "LOGIN_FAILED",
-        entity: "AUTH",
-        userId: profile.id,
-        storeId: profile.storeId,
-        metadata: { identifier, reason: "inactive" },
-      });
-      return { error: "Invalid email, username, or password." };
-    }
-
-    await createSession(profile.id);
-    await firestore.collection(collections.users).doc(profile.id).set(
-      {
-        lastLoginAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
     await finishSuccessfulLogin(profile, { identifier, provider: "password" });
   } catch (error) {
     if (isNextRedirect(error)) {

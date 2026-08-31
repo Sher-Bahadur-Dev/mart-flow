@@ -43,3 +43,12 @@ test("duplicate email is not hidden behind a generic hint", () => {
     "That email is already in use.",
   );
 });
+
+test("missing Google store profile errors are surfaced", () => {
+  assert.match(
+    publicAuthError(
+      new Error("No store account found for this Google user. Create one on the sign-up page."),
+    ),
+    /Google/,
+  );
+});

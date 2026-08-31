@@ -1,10 +1,12 @@
 "use client";
 
+import { signOut } from "firebase/auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
 import { logout } from "@/lib/auth/actions";
+import { getClientAuth } from "@/lib/firebase/client";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +90,7 @@ export function AppHeader({ onOpenMobile, user }: AppHeaderProps) {
           <DropdownMenuItem
             variant="destructive"
             onClick={() => {
+              void signOut(getClientAuth()).catch(() => undefined);
               void logout();
             }}
           >

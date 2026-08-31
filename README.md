@@ -8,7 +8,7 @@ Money is stored as decimal strings (`Decimal` with 2 places). Quantities use 3 p
 
 - Node.js 20+
 - npm
-- A Firebase project with Authentication (Email/Password) and Cloud Firestore enabled
+- A Firebase project with Authentication (Email/Password and Google) and Cloud Firestore enabled
 
 ## Setup
 
@@ -23,10 +23,22 @@ Set `SESSION_SECRET` in `.env` to a random string of at least 32 characters:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-Fill in the Firebase values from the Firebase console:
+Use the existing Firebase project `mart-flow`. Register a web app and fill client keys:
+
+```bash
+npx -y firebase-tools@latest login
+npx -y firebase-tools@latest use mart-flow
+npx -y firebase-tools@latest apps:create web mart-flow-web
+npx -y firebase-tools@latest apps:sdkconfig WEB
+npx -y firebase-tools@latest deploy --only auth,firestore
+```
+
+Copy the web SDK config into the `NEXT_PUBLIC_FIREBASE_*` variables.
+
+Admin SDK values:
 
 - `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY` come from a service account JSON (Project settings → Service accounts). The most reliable option on Windows is `FIREBASE_SERVICE_ACCOUNT_PATH` pointing at that JSON file. If you paste `FIREBASE_PRIVATE_KEY`, put it on one line in double quotes and keep the `\n` sequences from the JSON `private_key` field.
-- `NEXT_PUBLIC_FIREBASE_API_KEY` is the Web API key from Project settings → General.
+- `NEXT_PUBLIC_FIREBASE_API_KEY` is the Web API key from Project settings → General, or from `apps:sdkconfig`.
 
 On macOS/Linux use `cp .env.example .env`.
 

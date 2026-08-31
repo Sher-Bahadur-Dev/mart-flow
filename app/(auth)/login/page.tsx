@@ -12,7 +12,7 @@ export default function LoginPage() {
       <div className="mb-6 space-y-1">
         <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
         <p className="text-sm text-muted-foreground">
-          Sign in with your email or username, or create a new store account.
+          Sign in with email, username, or Google, or create a new store account.
         </p>
       </div>
       <LoginForm />

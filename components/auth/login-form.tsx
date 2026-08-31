@@ -1,19 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
-import { login } from "@/lib/auth/actions";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { login, loginWithGoogle } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 import type { LoginFormState } from "@/lib/validation/auth";
 
 export function LoginForm() {
+  const [clientError, setClientError] = useState<string | null>(null);
   const [state, action, pending] = useActionState<
     LoginFormState | undefined,
     FormData
   >(login, undefined);
+  const [googleState, googleAction, googlePending] = useActionState<
+    LoginFormState | undefined,
+    FormData
+  >(loginWithGoogle, undefined);
+
+  const error = clientError ?? googleState?.error ?? state?.error;
 
   return (
     <div className="space-y-3">
@@ -44,15 +52,28 @@ export function LoginForm() {
             required
           />
         </div>
-        {state?.error ? (
+        {error ? (
           <p className="text-sm text-destructive" role="alert">
-            {state.error}
+            {error}
           </p>
         ) : null}
-        <Button type="submit" disabled={pending} className="w-full">
+        <Button type="submit" disabled={pending || googlePending} className="w-full">
           {pending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
+      <div className="relative py-1 text-center text-xs text-muted-foreground">
+        <span className="bg-card px-2">or</span>
+      </div>
+      <GoogleSignInButton
+        label="Continue with Google"
+        pending={googlePending}
+        disabled={pending}
+        onToken={(formData) => {
+          setClientError(null);
+          googleAction(formData);
+        }}
+        onError={setClientError}
+      />
       <Link
         href="/signup"
         className={cn(buttonVariants({ variant: "outline" }), "w-full")}
