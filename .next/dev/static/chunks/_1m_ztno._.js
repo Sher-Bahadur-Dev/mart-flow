@@ -1,5 +1,0 @@
-(globalThis["TURBOPACK_CHUNK_LISTS"] || (globalThis["TURBOPACK_CHUNK_LISTS"] = [])).push({
-    script: typeof document === "object" ? document.currentScript : undefined,
-    chunks: ["static/chunks/[root-of-the-server]__0cbk-n2._.css","static/chunks/node_modules_0v0ijij._.js","static/chunks/_041liu0._.js","static/chunks/_1gathk-._.js","static/chunks/node_modules_0oliz-z._.js","static/chunks/app_global-error_tsx_0cmn22j._.js","static/chunks/_1w2662i._.js","static/chunks/node_modules_1c71cd3._.js","static/chunks/app_(dashboard)_error_tsx_13ai8rg._.js","static/chunks/node_modules_recharts_es6_util_0vub93i._.js","static/chunks/node_modules_recharts_es6_cartesian_17pqe-p._.js","static/chunks/node_modules_recharts_es6_component_0d4uchx._.js","static/chunks/node_modules_recharts_es6_state_03wu6us._.js","static/chunks/node_modules_recharts_es6_036a-gc._.js","static/chunks/node_modules_es-toolkit_dist_1cif-dc._.js","static/chunks/node_modules_1_mis58._.js","static/chunks/components_reports_sales-trend-chart_tsx_0sk47d-._.js"],
-    source: "entry"
-});

@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/Sher%20Bahadur/Desktop/New%20folder/mart-flow/app/(auth)/layout.tsx"],"sourcesContent":["import { APP_NAME } from \"@/constants/navigation\";\n\nexport default function AuthLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  return (\n    <div className=\"relative flex min-h-dvh flex-col bg-muted/40\">\n      <div className=\"pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_oklch(0.88_0.08_255),transparent_55%),radial-gradient(ellipse_at_bottom,_oklch(0.92_0.08_350),transparent_50%)] dark:bg-[radial-gradient(ellipse_at_top,_oklch(0.28_0.1_255),transparent_55%),radial-gradient(ellipse_at_bottom,_oklch(0.24_0.08_350),transparent_50%)]\" />\n      <header className=\"relative z-10 px-6 py-5 text-sm font-semibold tracking-tight\">\n        {APP_NAME}\n      </header>\n      <div className=\"relative z-10 flex flex-1 items-center justify-center p-6\">\n        {children}\n      </div>\n    </div>\n  );\n}\n"],"names":["AuthLayout","children","className"],"mappings":";;;;;AAAA;;;AAEe,SAASA,WAAW,EACjCC,QAAQ,EAGT;IACC,qBACE,8OAAC;QAAIC,WAAU;;0BACb,8OAAC;gBAAIA,WAAU;;;;;;0BACf,8OAAC;gBAAOA,WAAU;0BACf,mIAAQ;;;;;;0BAEX,8OAAC;gBAAIA,WAAU;0BACZD;;;;;;;;;;;;AAIT"}}]
-}

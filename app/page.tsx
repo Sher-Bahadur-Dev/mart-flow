@@ -1,5 +1,8 @@
-import { redirect } from "next/navigation";
-
 export default function Home() {
-  redirect("/dashboard");
+  return (
+    <main>
+      <h1>Welcome to Next.js!</h1>
+      <p>Start by editing <code>app/page.tsx</code>.</p>
+    </main>
+  );
 }
