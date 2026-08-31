@@ -29,3 +29,11 @@ export const SignupSchema = z
   });
 
 export type SignupInput = z.infer<typeof SignupSchema>;
+
+export const GoogleSignupSchema = z.object({
+  idToken: z.string().trim().min(1, "Google sign-in did not complete."),
+  storeName: z.string().trim().min(2, "Store name is required."),
+  name: z.string().trim().optional(),
+  username: USERNAME_SCHEMA,
+  phone: z.string().trim().optional(),
+});
