@@ -1,8 +1,6 @@
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -10,10 +8,10 @@ import {
 } from "firebase/firestore";
 
 import { COLLECTIONS } from "@/lib/firebase/collections";
-import { isFirebaseClientConfigured } from "@/lib/firebase/config";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asString } from "@/lib/firebase/mapper";
 import { ROLE_PERMISSIONS, type Role } from "@/lib/permissions";
+import { listOwnerDocs } from "@/lib/tenant";
 import type { UserProfile, UserStatus } from "@/types";
 
 export function hydrateUser(id: string, data: DocumentData): UserProfile {
@@ -30,14 +28,15 @@ export function hydrateUser(id: string, data: DocumentData): UserProfile {
       : [...(ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS.EMPLOYEE)],
     status: (asString(data.status, "ACTIVE") as UserStatus) || "ACTIVE",
     employeeId: typeof data.employeeId === "string" ? data.employeeId : null,
+    ownerId: asString(data.ownerId, role === "SUPER_ADMIN" ? id : ""),
     createdAt: asDate(data.createdAt),
     updatedAt: asDate(data.updatedAt),
   };
 }
 
 export async function listUsers() {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.users));
-  return snap.docs.map((item) => hydrateUser(item.id, item.data()));
+  const docs = await listOwnerDocs(COLLECTIONS.users);
+  return docs.map((item) => hydrateUser(item.id, item.data()));
 }
 
 export async function getUserProfile(uid: string) {
@@ -69,6 +68,7 @@ export async function createUserProfile(input: {
   role: Role;
   phone?: string | null;
   employeeId: string;
+  ownerId: string;
   status?: UserStatus;
 }) {
   const payload = {
@@ -81,6 +81,7 @@ export async function createUserProfile(input: {
     permissions: [...(ROLE_PERMISSIONS[input.role] ?? ROLE_PERMISSIONS.EMPLOYEE)],
     status: input.status ?? "ACTIVE",
     employeeId: input.employeeId,
+    ownerId: input.ownerId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -122,20 +123,4 @@ export async function updateUserProfile(
   }
   await updateDoc(doc(requireDb(), COLLECTIONS.users, uid), patch);
   return getUserProfile(uid);
-}
-
-export async function ownerExists() {
-  if (!isFirebaseClientConfigured()) {
-    return false;
-  }
-  const snap = await getDoc(doc(requireDb(), COLLECTIONS.settings, "bootstrap"));
-  return snap.exists();
-}
-
-export async function createOwnerBootstrap(ownerId: string) {
-  await setDoc(doc(requireDb(), COLLECTIONS.settings, "bootstrap"), {
-    ownerRegistered: true,
-    ownerId,
-    createdAt: serverTimestamp(),
-  });
 }

@@ -1,8 +1,9 @@
-import { collection, getDocs, limit, orderBy, query, type DocumentData } from "firebase/firestore";
+import { collection, getDocs, query, where, type DocumentData } from "firebase/firestore";
 
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { requireOwnerId } from "@/lib/tenant";
 import type { InventoryTransaction, InventoryTransactionType } from "@/types";
 
 function hydrateTransaction(id: string, data: DocumentData): InventoryTransaction {
@@ -22,7 +23,10 @@ function hydrateTransaction(id: string, data: DocumentData): InventoryTransactio
 
 export async function listInventoryTransactions(): Promise<InventoryTransaction[]> {
   const snap = await getDocs(
-    query(collection(requireDb(), COLLECTIONS.inventoryTransactions), orderBy("createdAt", "desc"), limit(50)),
+    query(collection(requireDb(), COLLECTIONS.inventoryTransactions), where("ownerId", "==", requireOwnerId())),
   );
-  return snap.docs.map((item) => hydrateTransaction(item.id, item.data()));
+  return snap.docs
+    .map((item) => hydrateTransaction(item.id, item.data()))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 50);
 }

@@ -17,6 +17,18 @@ service cloud.firestore {
       return signedIn() && exists(userPath()) && userData().status == 'ACTIVE';
     }
 
+    function tenantId() {
+      return userData().ownerId;
+    }
+
+    function sameTenant() {
+      return isActiveStaff() && resource.data.ownerId == tenantId();
+    }
+
+    function sameTenantWrite() {
+      return isActiveStaff() && request.resource.data.ownerId == tenantId();
+    }
+
     function role() {
       return userData().role;
     }
@@ -45,150 +57,184 @@ service cloud.firestore {
       return roleIn(['SUPER_ADMIN', 'ADMIN', 'MANAGER']);
     }
 
-    match /settings/bootstrap {
-      allow get: if true;
-      allow list: if false;
-      allow create: if signedIn()
-        && request.resource.data.ownerRegistered == true
-        && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if false;
-    }
-
     match /settings/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings() || (id == 'demo' && canManageStaff());
+      allow get: if signedIn() && (
+        id == request.auth.uid
+        || (isActiveStaff() && (id == tenantId() || id == ('demo_' + tenantId())))
+      );
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid && (
+        id == request.auth.uid || id == ('demo_' + request.auth.uid)
+      ) || (
+        canWriteSettings() && request.resource.data.ownerId == tenantId() && (
+          id == tenantId() || id == ('demo_' + tenantId())
+        )
+      );
+      allow update: if canWriteSettings() && request.resource.data.ownerId == tenantId();
+      allow delete: if false;
     }
 
     match /users/{userId} {
-      allow get: if signedIn() && (request.auth.uid == userId || isActiveStaff());
-      allow list: if isActiveStaff();
+      allow get: if signedIn() && (
+        request.auth.uid == userId
+        || (isActiveStaff() && resource.data.ownerId == tenantId())
+      );
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
       allow create: if signedIn() && (
         (
           request.auth.uid == userId
           && request.resource.data.role == 'SUPER_ADMIN'
           && request.resource.data.status == 'ACTIVE'
-          && !exists(/databases/$(database)/documents/settings/bootstrap)
+          && request.resource.data.ownerId == request.auth.uid
         )
         || (
           canManageStaff()
+          && request.resource.data.ownerId == tenantId()
           && request.resource.data.role in ['ADMIN', 'MANAGER', 'EMPLOYEE', 'CASHIER', 'INVENTORY_STAFF', 'PURCHASING', 'SUPPLIER', 'ACCOUNTANT']
         )
       );
-      allow update: if canManageStaff() || (
+      allow update: if (
+        canManageStaff()
+        && request.resource.data.ownerId == resource.data.ownerId
+        && resource.data.ownerId == tenantId()
+      ) || (
         signedIn()
         && request.auth.uid == userId
         && request.resource.data.role == resource.data.role
         && request.resource.data.status == resource.data.status
         && request.resource.data.permissions == resource.data.permissions
+        && request.resource.data.ownerId == resource.data.ownerId
       );
       allow delete: if false;
     }
 
     match /employees/{employeeId} {
-      allow read: if isActiveStaff();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
       allow create: if signedIn() && (
         (
           request.resource.data.role == 'SUPER_ADMIN'
           && request.resource.data.userId == request.auth.uid
-          && !exists(/databases/$(database)/documents/settings/bootstrap)
+          && request.resource.data.ownerId == request.auth.uid
         )
-        || canManageStaff()
+        || (canManageStaff() && request.resource.data.ownerId == tenantId())
       );
-      allow update: if canManageStaff();
-      allow delete: if roleIn(['SUPER_ADMIN']);
+      allow update: if canManageStaff() && resource.data.ownerId == tenantId() && request.resource.data.ownerId == tenantId();
+      allow delete: if roleIn(['SUPER_ADMIN']) && resource.data.ownerId == tenantId();
     }
 
     match /stores/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings();
+      allow get: if signedIn() && (resource == null || resource.data.ownerId == request.auth.uid || (isActiveStaff() && resource.data.ownerId == tenantId()));
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid
+        || (canWriteSettings() && request.resource.data.ownerId == tenantId());
+      allow update: if canWriteSettings() && sameTenantWrite() && resource.data.ownerId == tenantId();
+      allow delete: if false;
     }
 
     match /permissions/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings();
+      allow read: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow write: if canWriteSettings() && request.resource.data.ownerId == tenantId();
     }
 
     match /rolePermissions/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings();
+      allow read: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow write: if canWriteSettings() && request.resource.data.ownerId == tenantId();
     }
 
     match /userPermissions/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings();
+      allow read: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow write: if canWriteSettings() && request.resource.data.ownerId == tenantId();
     }
 
     match /counters/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canManageStaff();
+      allow read: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow write: if canManageStaff() && request.resource.data.ownerId == tenantId();
     }
 
     match /products/{id} {
-      allow read: if isActiveStaff();
-      allow create, delete: if canWriteCatalog();
-      allow update: if canWriteCatalog() || (
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow create: if canWriteCatalog() && request.resource.data.ownerId == tenantId();
+      allow delete: if canWriteCatalog() && resource.data.ownerId == tenantId();
+      allow update: if (
+        canWriteCatalog() && sameTenantWrite() && resource.data.ownerId == tenantId()
+      ) || (
         canWriteSales()
+        && resource.data.ownerId == tenantId()
+        && request.resource.data.ownerId == tenantId()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentStock', 'updatedAt'])
       );
     }
 
     match /categories/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteCatalog();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canWriteCatalog() && request.resource.data.ownerId == tenantId();
     }
 
     match /suppliers/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteCatalog();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canWriteCatalog() && request.resource.data.ownerId == tenantId();
     }
 
     match /customers/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSales() || canManageStaff();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if (canWriteSales() || canManageStaff()) && request.resource.data.ownerId == tenantId();
     }
 
     match /inventoryTransactions/{id} {
-      allow read: if isActiveStaff();
-      allow create: if canWriteCatalog() || canWriteSales();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow create: if (canWriteCatalog() || canWriteSales()) && request.resource.data.ownerId == tenantId();
       allow update, delete: if false;
     }
 
     match /sales/{id} {
-      allow read: if isActiveStaff();
-      allow create: if canWriteSales();
-      allow update: if canWriteSales();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow create: if canWriteSales() && request.resource.data.ownerId == tenantId();
+      allow update: if canWriteSales() && sameTenantWrite() && resource.data.ownerId == tenantId();
       allow delete: if false;
     }
 
     match /purchases/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteCatalog();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canWriteCatalog() && request.resource.data.ownerId == tenantId();
     }
 
     match /expenses/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteFinance();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canWriteFinance() && request.resource.data.ownerId == tenantId();
     }
 
     match /cashSessions/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteFinance() || canWriteSales();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if (canWriteFinance() || canWriteSales()) && request.resource.data.ownerId == tenantId();
     }
 
     match /notifications/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canManageStaff();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canManageStaff() && request.resource.data.ownerId == tenantId();
     }
 
     match /auditLogs/{id} {
-      allow read: if canManageStaff();
-      allow create: if isActiveStaff();
+      allow get: if canManageStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if canManageStaff() && resource.data.ownerId == tenantId();
+      allow create: if isActiveStaff() && request.resource.data.ownerId == tenantId();
       allow update, delete: if false;
     }
 
     match /roles/{id} {
-      allow read: if isActiveStaff();
-      allow write: if canWriteSettings();
+      allow get: if isActiveStaff() && (resource == null || resource.data.ownerId == tenantId());
+      allow list: if isActiveStaff() && resource.data.ownerId == tenantId();
+      allow write: if canWriteSettings() && request.resource.data.ownerId == tenantId();
     }
   }
 }

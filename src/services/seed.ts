@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, Timestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, serverTimestamp, setDoc, Timestamp, writeBatch } from "firebase/firestore";
 
 import {
   DEMO_CATEGORIES,
@@ -11,9 +11,15 @@ import {
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { createEmployeeAccount, findEmployeeByEmail } from "@/services/employees";
-import { DEFAULT_STORE_ID, ensureDefaultStore } from "@/services/stores";
-
-const DEMO_DOC = "demo";
+import { ensureDefaultStore } from "@/services/stores";
+import {
+  listOwnerDocs,
+  ownerDemoSettingsId,
+  ownerStoreId,
+  requireOwnerId,
+  tenantRecordId,
+  withOwner,
+} from "@/lib/tenant";
 
 export type DemoSeedStatus = {
   catalogSeeded: boolean;
@@ -23,7 +29,7 @@ export type DemoSeedStatus = {
 };
 
 async function readDemoStatus() {
-  const snap = await getDoc(doc(requireDb(), COLLECTIONS.settings, DEMO_DOC));
+  const snap = await getDoc(doc(requireDb(), COLLECTIONS.settings, ownerDemoSettingsId()));
   const data = snap.data();
   return {
     catalogSeeded: data?.catalogSeeded === true,
@@ -33,13 +39,17 @@ async function readDemoStatus() {
 
 async function writeDemoStatus(patch: { catalogSeeded?: boolean; staffSeeded?: boolean }) {
   const current = await readDemoStatus();
+  const ownerId = requireOwnerId();
   await setDoc(
-    doc(requireDb(), COLLECTIONS.settings, DEMO_DOC),
-    {
-      catalogSeeded: patch.catalogSeeded ?? current.catalogSeeded,
-      staffSeeded: patch.staffSeeded ?? current.staffSeeded,
-      updatedAt: serverTimestamp(),
-    },
+    doc(requireDb(), COLLECTIONS.settings, ownerDemoSettingsId(ownerId)),
+    withOwner(
+      {
+        catalogSeeded: patch.catalogSeeded ?? current.catalogSeeded,
+        staffSeeded: patch.staffSeeded ?? current.staffSeeded,
+        updatedAt: serverTimestamp(),
+      },
+      ownerId,
+    ),
     { merge: true },
   );
 }
@@ -53,43 +63,53 @@ export async function seedCatalog(createdBy: string): Promise<DemoSeedStatus> {
   const db = requireDb();
   const batch = writeBatch(db);
   const now = serverTimestamp();
+  const ownerId = requireOwnerId();
 
   for (const category of DEMO_CATEGORIES) {
-    batch.set(doc(db, COLLECTIONS.categories, category.id), {
-      id: category.id,
+    const id = tenantRecordId(category.id, ownerId);
+    batch.set(doc(db, COLLECTIONS.categories, id), withOwner({
+      id,
       name: category.name,
       parentId: null,
       status: "ACTIVE",
       createdAt: now,
       updatedAt: now,
-    });
+    }, ownerId));
   }
 
   for (const supplier of DEMO_SUPPLIERS) {
-    batch.set(doc(db, COLLECTIONS.suppliers, supplier.id), {
+    const id = tenantRecordId(supplier.id, ownerId);
+    batch.set(doc(db, COLLECTIONS.suppliers, id), withOwner({
       ...supplier,
+      id,
       taxNumber: null,
       notes: "Demo supplier",
       status: "ACTIVE",
       createdAt: now,
       updatedAt: now,
-    });
+    }, ownerId));
   }
 
   for (const customer of DEMO_CUSTOMERS) {
-    batch.set(doc(db, COLLECTIONS.customers, customer.id), {
+    const id = tenantRecordId(customer.id, ownerId);
+    batch.set(doc(db, COLLECTIONS.customers, id), withOwner({
       ...customer,
+      id,
       address: null,
       balance: 0,
       status: "ACTIVE",
       createdAt: now,
       updatedAt: now,
-    });
+    }, ownerId));
   }
 
   for (const product of DEMO_PRODUCTS) {
-    batch.set(doc(db, COLLECTIONS.products, product.id), {
+    const id = tenantRecordId(product.id, ownerId);
+    batch.set(doc(db, COLLECTIONS.products, id), withOwner({
       ...product,
+      id,
+      categoryId: product.categoryId ? tenantRecordId(product.categoryId, ownerId) : null,
+      supplierId: product.supplierId ? tenantRecordId(product.supplierId, ownerId) : null,
       tax: 0,
       discount: 0,
       maximumStock: null,
@@ -99,11 +119,11 @@ export async function seedCatalog(createdBy: string): Promise<DemoSeedStatus> {
       createdBy,
       createdAt: now,
       updatedAt: now,
-    });
+    }, ownerId));
     const txRef = doc(collection(db, COLLECTIONS.inventoryTransactions));
-    batch.set(txRef, {
+    batch.set(txRef, withOwner({
       id: txRef.id,
-      productId: product.id,
+      productId: id,
       type: "STOCK_IN",
       quantity: product.currentStock,
       previousStock: 0,
@@ -112,50 +132,16 @@ export async function seedCatalog(createdBy: string): Promise<DemoSeedStatus> {
       referenceId: "demo-seed",
       userId: createdBy,
       createdAt: now,
-    });
+    }, ownerId));
   }
 
   batch.set(
-    doc(db, COLLECTIONS.settings, "store"),
-    {
-      id: "store",
-      storeName: "MartFlow Demo Mart",
-      logoUrl: null,
-      address: "Shop 12, Gulshan-e-Iqbal, Karachi",
-      phone: "021-34900000",
-      email: "owner@martflow.demo",
-      currency: "PKR",
-      tax: 0,
-      receiptFooter: "Thank you for shopping with us.",
-      invoicePrefix: "MF",
-      lowStockThreshold: 10,
-      createdAt: now,
-      updatedAt: now,
-    },
-    { merge: true },
-  );
-
-  batch.set(
-    doc(db, COLLECTIONS.stores, DEFAULT_STORE_ID),
-    {
-      id: DEFAULT_STORE_ID,
-      name: "MartFlow Demo Mart",
-      isActive: true,
-      address: "Shop 12, Gulshan-e-Iqbal, Karachi",
-      phone: "021-34900000",
-      createdAt: now,
-      updatedAt: now,
-    },
-    { merge: true },
-  );
-
-  batch.set(
-    doc(db, COLLECTIONS.settings, DEMO_DOC),
-    {
+    doc(db, COLLECTIONS.settings, ownerDemoSettingsId(ownerId)),
+    withOwner({
       catalogSeeded: true,
       staffSeeded: status.staffSeeded,
       updatedAt: now,
-    },
+    }, ownerId),
     { merge: true },
   );
 
@@ -166,7 +152,7 @@ export async function seedCatalog(createdBy: string): Promise<DemoSeedStatus> {
 export async function seedDemoStaff(): Promise<DemoSeedStatus> {
   const status = await readDemoStatus();
   const store = await ensureDefaultStore();
-  const storeId = store?.id ?? DEFAULT_STORE_ID;
+  const storeId = store?.id ?? ownerStoreId();
   const staffCreated: string[] = [];
   const staffSkipped: string[] = [];
 
@@ -212,13 +198,14 @@ export async function seedDemoStaff(): Promise<DemoSeedStatus> {
 
 export async function seedDemoSales(createdBy: string) {
   const db = requireDb();
-  const existing = await getDocs(collection(db, COLLECTIONS.sales));
-  if (!existing.empty) {
+  const ownerId = requireOwnerId();
+  const existing = await listOwnerDocs(COLLECTIONS.sales);
+  if (existing.length > 0) {
     return;
   }
 
-  const productSnap = await getDocs(collection(db, COLLECTIONS.products));
-  const products = productSnap.docs.map((item) => ({
+  const productSnap = await listOwnerDocs(COLLECTIONS.products);
+  const products = productSnap.map((item) => ({
     id: item.id,
     name: String(item.data().name ?? ""),
     sku: String(item.data().sku ?? ""),
@@ -269,8 +256,9 @@ export async function seedDemoSales(createdBy: string) {
     const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
     batch.set(saleRef, {
       id: saleRef.id,
+      ownerId,
       invoiceNumber: `MF-D${String(dayOffset + 1).padStart(3, "0")}`,
-      customerId: dayOffset % 2 === 0 ? "cust_walkin" : "cust_ahmed",
+      customerId: dayOffset % 2 === 0 ? tenantRecordId("cust_walkin", ownerId) : tenantRecordId("cust_ahmed", ownerId),
       cashierId: createdBy,
       items,
       subtotal,
@@ -293,9 +281,10 @@ export async function seedDemoSales(createdBy: string) {
 export async function seedOperationalModules(createdBy: string) {
   const db = requireDb();
   const now = Timestamp.now();
+  const ownerId = requireOwnerId();
 
-  const purchaseSnap = await getDocs(collection(db, COLLECTIONS.purchases));
-  if (purchaseSnap.empty) {
+  const purchaseSnap = await listOwnerDocs(COLLECTIONS.purchases);
+  if (purchaseSnap.length === 0) {
     const batch = writeBatch(db);
     const orders = [
       {
@@ -340,6 +329,7 @@ export async function seedOperationalModules(createdBy: string) {
     orders.forEach((order, index) => {
       const items = order.items.map((item) => ({
         ...item,
+        productId: tenantRecordId(item.productId, ownerId),
         discount: 0,
         tax: 0,
         lineTotal: item.unitPrice * item.quantity,
@@ -347,10 +337,11 @@ export async function seedOperationalModules(createdBy: string) {
       const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
       const created = new Date();
       created.setDate(created.getDate() - (orders.length - index));
-      batch.set(doc(db, COLLECTIONS.purchases, order.id), {
-        id: order.id,
+      const id = tenantRecordId(order.id, ownerId);
+      batch.set(doc(db, COLLECTIONS.purchases, id), withOwner({
+        id,
         orderNumber: `PO-${String(index + 1).padStart(4, "0")}`,
-        supplierId: order.supplierId,
+        supplierId: tenantRecordId(order.supplierId, ownerId),
         status: order.status,
         items,
         subtotal,
@@ -362,13 +353,13 @@ export async function seedOperationalModules(createdBy: string) {
         createdBy,
         createdAt: Timestamp.fromDate(created),
         updatedAt: Timestamp.fromDate(created),
-      });
+      }, ownerId));
     });
     await batch.commit();
   }
 
-  const expenseSnap = await getDocs(collection(db, COLLECTIONS.expenses));
-  if (expenseSnap.empty) {
+  const expenseSnap = await listOwnerDocs(COLLECTIONS.expenses);
+  if (expenseSnap.length === 0) {
     const batch = writeBatch(db);
     [
       { title: "Shop rent", category: "Rent", amount: 85000 },
@@ -379,7 +370,7 @@ export async function seedOperationalModules(createdBy: string) {
       const ref = doc(collection(db, COLLECTIONS.expenses));
       const date = new Date();
       date.setDate(date.getDate() - index * 3);
-      batch.set(ref, {
+      batch.set(ref, withOwner({
         id: ref.id,
         ...expense,
         paymentMethod: "BANK_TRANSFER",
@@ -388,15 +379,15 @@ export async function seedOperationalModules(createdBy: string) {
         createdBy,
         createdAt: now,
         updatedAt: now,
-      });
+      }, ownerId));
     });
     await batch.commit();
   }
 
-  const cashSnap = await getDocs(collection(db, COLLECTIONS.cashSessions));
-  if (cashSnap.empty) {
+  const cashSnap = await listOwnerDocs(COLLECTIONS.cashSessions);
+  if (cashSnap.length === 0) {
     const ref = doc(collection(db, COLLECTIONS.cashSessions));
-    await setDoc(ref, {
+    await setDoc(ref, withOwner({
       id: ref.id,
       openedBy: createdBy,
       closedBy: null,
@@ -411,11 +402,11 @@ export async function seedOperationalModules(createdBy: string) {
       closedAt: null,
       createdAt: now,
       updatedAt: now,
-    });
+    }, ownerId));
   }
 
-  const noteSnap = await getDocs(collection(db, COLLECTIONS.notifications));
-  if (noteSnap.empty) {
+  const noteSnap = await listOwnerDocs(COLLECTIONS.notifications);
+  if (noteSnap.length === 0) {
     const batch = writeBatch(db);
     [
       { title: "Low stock: Basmati Rice 5kg", body: "On-hand quantity is below the minimum. Raise a purchase order." },
@@ -423,7 +414,7 @@ export async function seedOperationalModules(createdBy: string) {
       { title: "POS shift", body: "Today's cash sales are recorded on the open till." },
     ].forEach((note) => {
       const ref = doc(collection(db, COLLECTIONS.notifications));
-      batch.set(ref, { id: ref.id, ...note, read: false, createdAt: now });
+      batch.set(ref, withOwner({ id: ref.id, ...note, read: false, createdAt: now }, ownerId));
     });
     await batch.commit();
   }

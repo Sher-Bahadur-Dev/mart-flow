@@ -47,6 +47,7 @@ export type UserProfile = TimestampFields & {
   permissions: Permission[];
   status: UserStatus;
   employeeId: string | null;
+  ownerId: string;
 };
 
 export type Product = TimestampFields & {
@@ -250,6 +251,7 @@ export type Store = TimestampFields & {
   isActive: boolean;
   address: string | null;
   phone: string | null;
+  ownerId?: string;
 };
 
 export type Employee = TimestampFields & {
@@ -271,4 +273,5 @@ export type Employee = TimestampFields & {
   removed: boolean;
   address: string | null;
   emergencyContact: string | null;
+  ownerId: string;
 };

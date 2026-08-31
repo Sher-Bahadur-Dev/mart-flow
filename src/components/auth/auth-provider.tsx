@@ -19,6 +19,7 @@ import {
   signOutStaff,
 } from "@/services/auth";
 import { getUserProfile } from "@/services/users";
+import { ownerIdFromProfile, setActiveOwnerId } from "@/lib/tenant";
 import type { UserProfile } from "@/types";
 
 type AuthContextValue = {
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setUser(nextUser);
       if (!nextUser) {
+        setActiveOwnerId(null);
         setProfile(null);
         setLoading(false);
         return;
@@ -83,9 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextProfile = await loadProfile(nextUser.uid);
       if (nextProfile && nextProfile.status !== "ACTIVE") {
         await signOutStaff();
+        setActiveOwnerId(null);
         setProfile(null);
         setUser(null);
       } else {
+        setActiveOwnerId(ownerIdFromProfile(nextProfile));
         setProfile(nextProfile);
       }
       setLoading(false);
@@ -96,7 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) {
       return;
     }
-    setProfile(await getUserProfile(user.uid));
+    const nextProfile = await getUserProfile(user.uid);
+    setActiveOwnerId(ownerIdFromProfile(nextProfile));
+    setProfile(nextProfile);
   }, [user]);
 
   const signIn = useCallback((email: string, password: string) => signInStaff(email, password), []);

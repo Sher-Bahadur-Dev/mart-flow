@@ -1,13 +1,9 @@
 import {
-  collection,
   doc,
   getDoc,
-  getDocs,
-  query,
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
   type DocumentData,
 } from "firebase/firestore";
 import {
@@ -26,8 +22,8 @@ import { mapAuthError } from "@/lib/auth/errors";
 import type { Employee, UserStatus } from "@/types";
 
 import { writeAuditLog } from "@/services/audit";
-import { DEFAULT_STORE_ID } from "@/services/stores";
 import { createUserProfile, updateUserProfile } from "@/services/users";
+import { listOwnerDocs, ownerStoreId, requireOwnerId } from "@/lib/tenant";
 
 function statusFromActive(isActive: boolean): UserStatus {
   return isActive ? "ACTIVE" : "INACTIVE";
@@ -65,43 +61,35 @@ export function hydrateEmployee(id: string, data: DocumentData): Employee {
     removed: asBoolean(data.removed),
     address: typeof data.address === "string" ? data.address : null,
     emergencyContact: typeof data.emergencyContact === "string" ? data.emergencyContact : null,
+    ownerId: asString(data.ownerId),
     createdAt: asDate(data.createdAt),
     updatedAt: asDate(data.updatedAt),
   };
 }
 
 export async function listEmployees() {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.employees));
-  return snap.docs
-    .map((item) => hydrateEmployee(item.id, item.data()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const docs = await listOwnerDocs(COLLECTIONS.employees);
+  return docs.map((item) => hydrateEmployee(item.id, item.data())).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getEmployee(id: string) {
   const snap = await getDoc(doc(requireDb(), COLLECTIONS.employees, id));
-  if (!snap.exists()) {
+  if (!snap.exists() || asString(snap.data().ownerId) !== requireOwnerId()) {
     return null;
   }
   return hydrateEmployee(snap.id, snap.data());
 }
 
 export async function findEmployeeByEmail(email: string, excludeId?: string) {
-  const snap = await getDocs(
-    query(collection(requireDb(), COLLECTIONS.employees), where("email", "==", email.toLowerCase())),
-  );
-  const match = snap.docs.find((item) => item.id !== excludeId);
-  return match ? hydrateEmployee(match.id, match.data()) : null;
+  const normalized = email.toLowerCase();
+  const employees = await listEmployees();
+  return employees.find((item) => item.email === normalized && item.id !== excludeId) ?? null;
 }
 
 export async function findEmployeeByCode(employeeCode: string, excludeId?: string) {
-  const snap = await getDocs(
-    query(
-      collection(requireDb(), COLLECTIONS.employees),
-      where("employeeCode", "==", employeeCode.trim()),
-    ),
-  );
-  const match = snap.docs.find((item) => item.id !== excludeId);
-  return match ? hydrateEmployee(match.id, match.data()) : null;
+  const code = employeeCode.trim();
+  const employees = await listEmployees();
+  return employees.find((item) => item.employeeCode === code && item.id !== excludeId) ?? null;
 }
 
 type EmployeeWriteInput = {
@@ -121,6 +109,7 @@ type EmployeeWriteInput = {
   storeId?: string | null;
   address?: string | null;
   emergencyContact?: string | null;
+  ownerId?: string;
 };
 
 function employeePayload(input: EmployeeWriteInput) {
@@ -144,6 +133,7 @@ function employeePayload(input: EmployeeWriteInput) {
     storeId: input.storeId ?? null,
     address: input.address?.trim() || null,
     emergencyContact: input.emergencyContact?.trim() || null,
+    ownerId: input.ownerId ?? requireOwnerId(),
     updatedAt: serverTimestamp(),
   };
 }
@@ -217,9 +207,10 @@ export async function createEmployeeAccount(input: EmployeeProfileInput & { acto
         employeeCode: code,
         jobTitle: input.jobTitle,
         salary: input.salary ?? null,
-        storeId: input.storeId || DEFAULT_STORE_ID,
+        storeId: input.storeId || ownerStoreId(),
         address: input.address,
         emergencyContact: input.emergencyContact,
+        ownerId: requireOwnerId(),
       });
       await createUserProfile({
         id: uid,
@@ -228,6 +219,7 @@ export async function createEmployeeAccount(input: EmployeeProfileInput & { acto
         role: input.role,
         phone: input.phone,
         employeeId: uid,
+        ownerId: requireOwnerId(),
         status: statusFromActive(isActive),
       });
       await signOut(provisioning);

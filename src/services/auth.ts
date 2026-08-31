@@ -8,10 +8,12 @@ import {
 
 import { mapAuthError } from "@/lib/auth/errors";
 import { requireClientAuth } from "@/lib/firebase/db";
+import { setActiveOwnerId } from "@/lib/tenant";
 
-import { createOwnerBootstrap, createUserProfile, getUserProfile, ownerExists } from "@/services/users";
 import { writeEmployeeRecord } from "@/services/employees";
-import { seedCatalog } from "@/services/seed";
+import { createOwnerSettings } from "@/services/settings";
+import { createOwnerStore } from "@/services/stores";
+import { createUserProfile, getUserProfile } from "@/services/users";
 
 export async function signInStaff(email: string, password: string) {
   const auth = requireClientAuth();
@@ -26,6 +28,7 @@ export async function signInStaff(email: string, password: string) {
       await signOut(auth);
       throw new Error("This account is inactive or suspended. Contact the store owner.");
     }
+    setActiveOwnerId(profile.ownerId || (profile.role === "SUPER_ADMIN" ? profile.id : null));
     return profile;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("No staff")) {
@@ -39,10 +42,6 @@ export async function signInStaff(email: string, password: string) {
 }
 
 export async function registerOwner(input: { name: string; email: string; password: string }) {
-  if (await ownerExists()) {
-    throw new Error("An owner account already exists. Ask them to add you from Employees.");
-  }
-
   const auth = requireClientAuth();
   try {
     const credential = await createUserWithEmailAndPassword(
@@ -52,8 +51,18 @@ export async function registerOwner(input: { name: string; email: string; passwo
     );
     await updateProfile(credential.user, { displayName: input.name });
     const uid = credential.user.uid;
+    const storeName = `${input.name.trim()}'s Store`;
+    setActiveOwnerId(uid);
 
     try {
+      await createUserProfile({
+        id: uid,
+        name: input.name,
+        email: input.email,
+        role: "SUPER_ADMIN",
+        employeeId: uid,
+        ownerId: uid,
+      });
       await writeEmployeeRecord({
         id: uid,
         name: input.name,
@@ -63,24 +72,23 @@ export async function registerOwner(input: { name: string; email: string; passwo
         employeeCode: "OWN-0001",
         jobTitle: "Owner",
         isActive: true,
+        ownerId: uid,
+        storeId: `store_${uid}`,
       });
-      await createUserProfile({
-        id: uid,
-        name: input.name,
-        email: input.email,
-        role: "SUPER_ADMIN",
-        employeeId: uid,
+      await createOwnerStore({
+        ownerId: uid,
+        name: storeName,
+        email: input.email.trim().toLowerCase(),
       });
-      await createOwnerBootstrap(uid);
+      await createOwnerSettings({
+        ownerId: uid,
+        storeName,
+        email: input.email.trim().toLowerCase(),
+      });
     } catch (error) {
       await credential.user.delete();
+      setActiveOwnerId(null);
       throw error;
-    }
-
-    try {
-      await seedCatalog(uid);
-    } catch {
-      // Owner can load demo catalog from Settings if this fails.
     }
 
     return getUserProfile(uid);
@@ -99,6 +107,7 @@ export async function requestPasswordReset(email: string) {
 }
 
 export async function signOutStaff() {
+  setActiveOwnerId(null);
   const auth = requireClientAuth();
   await signOut(auth);
 }

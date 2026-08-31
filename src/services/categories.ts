@@ -1,8 +1,8 @@
-import { collection, getDocs, type DocumentData } from "firebase/firestore";
+import { type DocumentData } from "firebase/firestore";
 
 import { COLLECTIONS } from "@/lib/firebase/collections";
-import { requireDb } from "@/lib/firebase/db";
 import { asDate, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs } from "@/lib/tenant";
 import type { Category } from "@/types";
 
 function hydrateCategory(id: string, data: DocumentData): Category {
@@ -17,8 +17,6 @@ function hydrateCategory(id: string, data: DocumentData): Category {
 }
 
 export async function listCategories(): Promise<Category[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.categories));
-  return snap.docs
-    .map((item) => hydrateCategory(item.id, item.data()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const docs = await listOwnerDocs(COLLECTIONS.categories);
+  return docs.map((item) => hydrateCategory(item.id, item.data())).sort((a, b) => a.name.localeCompare(b.name));
 }

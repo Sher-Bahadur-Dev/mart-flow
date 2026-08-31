@@ -1,8 +1,9 @@
-import { collection, doc, getDoc, getDocs, type DocumentData } from "firebase/firestore";
+import { doc, getDoc, type DocumentData } from "firebase/firestore";
 
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, requireOwnerId } from "@/lib/tenant";
 import type { Product } from "@/types";
 
 export function hydrateProduct(id: string, data: DocumentData): Product {
@@ -32,15 +33,13 @@ export function hydrateProduct(id: string, data: DocumentData): Product {
 }
 
 export async function listProducts(): Promise<Product[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.products));
-  return snap.docs
-    .map((item) => hydrateProduct(item.id, item.data()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const docs = await listOwnerDocs(COLLECTIONS.products);
+  return docs.map((item) => hydrateProduct(item.id, item.data())).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getProduct(id: string) {
   const snap = await getDoc(doc(requireDb(), COLLECTIONS.products, id));
-  if (!snap.exists()) {
+  if (!snap.exists() || snap.data().ownerId !== requireOwnerId()) {
     return null;
   }
   return hydrateProduct(snap.id, snap.data());

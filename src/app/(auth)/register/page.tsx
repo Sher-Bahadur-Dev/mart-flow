@@ -10,7 +10,7 @@ export default function RegisterPage() {
       <div>
         <h1 className="text-lg font-semibold">Create owner account</h1>
         <p className="text-sm text-muted-foreground">
-          The first account is the store owner. Employees are added later from the staff module.
+          Create your owner account to get started with your demo store.
         </p>
       </div>
       <RegisterForm />

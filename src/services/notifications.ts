@@ -3,6 +3,7 @@ import { collection, doc, getDocs, serverTimestamp, setDoc, updateDoc, type Docu
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, withOwner } from "@/lib/tenant";
 import type { AppNotification } from "@/types";
 
 export function hydrateNotification(id: string, data: DocumentData): AppNotification {
@@ -16,8 +17,8 @@ export function hydrateNotification(id: string, data: DocumentData): AppNotifica
 }
 
 export async function listNotifications(): Promise<AppNotification[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.notifications));
-  return snap.docs
+  const docs = await listOwnerDocs(COLLECTIONS.notifications);
+  return docs
     .map((item) => hydrateNotification(item.id, item.data()))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
@@ -28,11 +29,14 @@ export async function markNotificationRead(id: string) {
 
 export async function createNotification(input: { title: string; body: string }) {
   const ref = doc(collection(requireDb(), COLLECTIONS.notifications));
-  await setDoc(ref, {
-    id: ref.id,
-    title: input.title,
-    body: input.body,
-    read: false,
-    createdAt: serverTimestamp(),
-  });
+  await setDoc(
+    ref,
+    withOwner({
+      id: ref.id,
+      title: input.title,
+      body: input.body,
+      read: false,
+      createdAt: serverTimestamp(),
+    }),
+  );
 }

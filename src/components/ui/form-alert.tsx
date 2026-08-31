@@ -7,7 +7,7 @@ export function FormAlert({
   tone = "error",
 }: {
   message: string | null;
-  tone?: "error" | "success";
+  tone?: "error" | "success" | "info";
 }) {
   if (!message) {
     return null;
@@ -18,7 +18,9 @@ export function FormAlert({
         "rounded-md border px-3 py-2 text-sm",
         tone === "error"
           ? "border-destructive/30 bg-destructive/10 text-destructive"
-          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+          : tone === "success"
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+            : "border-border bg-muted/60 text-foreground",
       )}
       role="status"
     >

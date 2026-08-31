@@ -3,6 +3,7 @@ import { collection, doc, getDocs, serverTimestamp, setDoc, type DocumentData } 
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, withOwner } from "@/lib/tenant";
 import type { CashSession } from "@/types";
 
 export function hydrateCashSession(id: string, data: DocumentData): CashSession {
@@ -25,8 +26,8 @@ export function hydrateCashSession(id: string, data: DocumentData): CashSession 
 }
 
 export async function listCashSessions(): Promise<CashSession[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.cashSessions));
-  return snap.docs
+  const docs = await listOwnerDocs(COLLECTIONS.cashSessions);
+  return docs
     .map((item) => hydrateCashSession(item.id, item.data()))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
@@ -34,20 +35,23 @@ export async function listCashSessions(): Promise<CashSession[]> {
 export async function openCashSession(input: { openedBy: string; openingCash: number; cashSales?: number }) {
   const ref = doc(collection(requireDb(), COLLECTIONS.cashSessions));
   const expected = input.openingCash + (input.cashSales ?? 0);
-  await setDoc(ref, {
-    id: ref.id,
-    openedBy: input.openedBy,
-    closedBy: null,
-    openingCash: input.openingCash,
-    cashSales: input.cashSales ?? 0,
-    cashExpenses: 0,
-    cashRefunds: 0,
-    withdrawals: 0,
-    actualCash: null,
-    expectedCash: expected,
-    difference: null,
-    closedAt: null,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  await setDoc(
+    ref,
+    withOwner({
+      id: ref.id,
+      openedBy: input.openedBy,
+      closedBy: null,
+      openingCash: input.openingCash,
+      cashSales: input.cashSales ?? 0,
+      cashExpenses: 0,
+      cashRefunds: 0,
+      withdrawals: 0,
+      actualCash: null,
+      expectedCash: expected,
+      difference: null,
+      closedAt: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  );
 }

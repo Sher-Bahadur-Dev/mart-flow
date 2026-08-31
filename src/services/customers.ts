@@ -3,6 +3,7 @@ import { collection, doc, getDoc, getDocs, type DocumentData } from "firebase/fi
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, requireOwnerId } from "@/lib/tenant";
 import type { Customer } from "@/types";
 
 function hydrateCustomer(id: string, data: DocumentData): Customer {
@@ -21,15 +22,13 @@ function hydrateCustomer(id: string, data: DocumentData): Customer {
 }
 
 export async function listCustomers(): Promise<Customer[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.customers));
-  return snap.docs
-    .map((item) => hydrateCustomer(item.id, item.data()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const docs = await listOwnerDocs(COLLECTIONS.customers);
+  return docs.map((item) => hydrateCustomer(item.id, item.data())).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getCustomer(id: string) {
   const snap = await getDoc(doc(requireDb(), COLLECTIONS.customers, id));
-  if (!snap.exists()) {
+  if (!snap.exists() || snap.data().ownerId !== requireOwnerId()) {
     return null;
   }
   return hydrateCustomer(snap.id, snap.data());

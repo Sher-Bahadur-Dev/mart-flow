@@ -4,6 +4,7 @@ import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asBoolean, asDate, asNumber, asString } from "@/lib/firebase/mapper";
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLES, type Permission, type Role } from "@/lib/permissions";
+import { ownerRoleDocId, ownerSettingsId, requireOwnerId, withOwner } from "@/lib/tenant";
 import type { StoreSettings } from "@/types";
 
 const DEFAULT_UNITS = ["pcs", "carton", "bag", "bottle", "pack", "bar", "kg", "L"];
@@ -17,17 +18,17 @@ export function defaultStoreSettings(): StoreSettings {
   const now = new Date();
   return {
     id: "store",
-    storeName: "MartFlow Demo Mart",
+    storeName: "My Store",
     logoUrl: null,
-    address: "Shop 12, Gulshan-e-Iqbal, Karachi",
-    phone: "021-34900000",
-    email: "hello@martflow.demo",
+    address: null,
+    phone: null,
+    email: null,
     currency: "PKR",
     tax: 0,
     taxEnabled: false,
     taxLabel: "VAT",
     taxInclusive: false,
-    receiptHeader: "MartFlow Demo Mart",
+    receiptHeader: "My Store",
     receiptFooter: "Thank you for shopping with us.",
     receiptShowTax: true,
     invoicePrefix: "MF",
@@ -108,24 +109,55 @@ export function hydrateStoreSettings(data: Record<string, unknown> | undefined):
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
-  const snap = await getDoc(doc(requireDb(), COLLECTIONS.settings, "store"));
-  return hydrateStoreSettings(snap.exists() ? (snap.data() as Record<string, unknown>) : undefined);
+  const ownerId = requireOwnerId();
+  const snap = await getDoc(doc(requireDb(), COLLECTIONS.settings, ownerSettingsId(ownerId)));
+  const hydrated = hydrateStoreSettings(snap.exists() ? (snap.data() as Record<string, unknown>) : undefined);
+  return { ...hydrated, id: ownerId };
 }
 
 export async function saveStoreSettings(input: Partial<StoreSettings>) {
+  const ownerId = requireOwnerId();
   const current = await getStoreSettings();
   const next = hydrateStoreSettings({ ...current, ...input } as unknown as Record<string, unknown>);
   const { createdAt: _createdAt, updatedAt: _updatedAt, ...payload } = next;
   await setDoc(
-    doc(requireDb(), COLLECTIONS.settings, "store"),
-    {
-      ...payload,
-      createdAt: current.createdAt,
-      updatedAt: serverTimestamp(),
-    },
+    doc(requireDb(), COLLECTIONS.settings, ownerSettingsId(ownerId)),
+    withOwner(
+      {
+        ...payload,
+        id: ownerId,
+        createdAt: current.createdAt,
+        updatedAt: serverTimestamp(),
+      },
+      ownerId,
+    ),
     { merge: true },
   );
   return getStoreSettings();
+}
+
+export async function createOwnerSettings(input: { ownerId: string; storeName: string; email?: string | null }) {
+  const id = ownerSettingsId(input.ownerId);
+  const existing = await getDoc(doc(requireDb(), COLLECTIONS.settings, id));
+  if (existing.exists()) {
+    return hydrateStoreSettings(existing.data() as Record<string, unknown>);
+  }
+  const base = defaultStoreSettings();
+  await setDoc(
+    doc(requireDb(), COLLECTIONS.settings, id),
+    withOwner(
+      {
+        ...base,
+        id,
+        storeName: input.storeName,
+        receiptHeader: input.storeName,
+        email: input.email ?? null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      input.ownerId,
+    ),
+  );
 }
 
 export async function getRolePermissionMap(): Promise<Record<Role, Permission[]>> {
@@ -133,7 +165,7 @@ export async function getRolePermissionMap(): Promise<Record<Role, Permission[]>
     ROLES.map((role) => [role, [...(ROLE_PERMISSIONS[role] ?? [])]]),
   ) as Record<Role, Permission[]>;
   for (const role of ROLES) {
-    const snap = await getDoc(doc(requireDb(), COLLECTIONS.roles, role));
+    const snap = await getDoc(doc(requireDb(), COLLECTIONS.roles, ownerRoleDocId(role)));
     if (snap.exists() && Array.isArray(snap.data().permissions)) {
       map[role] = snap
         .data()
@@ -146,14 +178,18 @@ export async function getRolePermissionMap(): Promise<Record<Role, Permission[]>
 }
 
 export async function saveRolePermissions(role: Role, permissions: Permission[]) {
+  const ownerId = requireOwnerId();
   await setDoc(
-    doc(requireDb(), COLLECTIONS.roles, role),
-    {
-      id: role,
-      role,
-      permissions,
-      updatedAt: serverTimestamp(),
-    },
+    doc(requireDb(), COLLECTIONS.roles, ownerRoleDocId(role, ownerId)),
+    withOwner(
+      {
+        id: ownerRoleDocId(role, ownerId),
+        role,
+        permissions,
+        updatedAt: serverTimestamp(),
+      },
+      ownerId,
+    ),
     { merge: true },
   );
 }

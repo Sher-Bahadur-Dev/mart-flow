@@ -12,6 +12,7 @@ import {
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, requireOwnerId } from "@/lib/tenant";
 import { getStoreSettings } from "@/services/settings";
 import type { Purchase, PurchaseItem, PurchaseStatus } from "@/types";
 
@@ -63,15 +64,15 @@ export const PURCHASE_STATUS_LABEL: Record<PurchaseStatus, string> = {
 };
 
 export async function listPurchases(): Promise<Purchase[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.purchases));
-  return snap.docs
+  const docs = await listOwnerDocs(COLLECTIONS.purchases);
+  return docs
     .map((item) => hydratePurchase(item.id, item.data()))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function getPurchase(id: string) {
   const snap = await getDoc(doc(requireDb(), COLLECTIONS.purchases, id));
-  if (!snap.exists()) {
+  if (!snap.exists() || snap.data().ownerId !== requireOwnerId()) {
     return null;
   }
   return hydratePurchase(snap.id, snap.data());
@@ -104,6 +105,7 @@ export async function createPurchaseOrder(input: {
   await runTransaction(db, async (transaction) => {
     transaction.set(ref, {
       id: ref.id,
+      ownerId: requireOwnerId(),
       orderNumber: `PO-${ref.id.slice(-6).toUpperCase()}`,
       supplierId: input.supplierId,
       status,
@@ -172,6 +174,7 @@ export async function receivePurchase(id: string, receipts: Record<string, numbe
       const txRef = doc(collection(db, COLLECTIONS.inventoryTransactions));
       transaction.set(txRef, {
         id: txRef.id,
+        ownerId: requireOwnerId(),
         productId: item.productId,
         type: "PURCHASE",
         quantity: item.added,

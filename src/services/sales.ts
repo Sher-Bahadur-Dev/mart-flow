@@ -11,6 +11,7 @@ import {
 import { COLLECTIONS } from "@/lib/firebase/collections";
 import { requireDb } from "@/lib/firebase/db";
 import { asDate, asNumber, asString } from "@/lib/firebase/mapper";
+import { listOwnerDocs, requireOwnerId, walkInCustomerId } from "@/lib/tenant";
 import { getStoreSettings } from "@/services/settings";
 import type { PaymentMethod, Sale, SaleItem, SaleStatus } from "@/types";
 
@@ -48,15 +49,15 @@ export function hydrateSale(id: string, data: DocumentData): Sale {
 }
 
 export async function listSales(): Promise<Sale[]> {
-  const snap = await getDocs(collection(requireDb(), COLLECTIONS.sales));
-  return snap.docs
+  const docs = await listOwnerDocs(COLLECTIONS.sales);
+  return docs
     .map((item) => hydrateSale(item.id, item.data()))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 export async function getSale(id: string) {
   const snap = await getDoc(doc(requireDb(), COLLECTIONS.sales, id));
-  if (!snap.exists()) {
+  if (!snap.exists() || snap.data().ownerId !== requireOwnerId()) {
     return null;
   }
   return hydrateSale(snap.id, snap.data());
@@ -149,6 +150,7 @@ export async function createPosSale(input: {
       const txRef = doc(collection(db, COLLECTIONS.inventoryTransactions));
       transaction.set(txRef, {
         id: txRef.id,
+        ownerId: requireOwnerId(),
         productId: product.id,
         type: "SALE",
         quantity: product.quantity,
@@ -163,8 +165,9 @@ export async function createPosSale(input: {
 
     transaction.set(saleRef, {
       id: saleRef.id,
+      ownerId: requireOwnerId(),
       invoiceNumber,
-      customerId: input.customerId ?? (settings.walkInCustomerEnabled ? "cust_walkin" : null),
+      customerId: input.customerId ?? (settings.walkInCustomerEnabled ? walkInCustomerId() : null),
       cashierId: input.cashierId,
       items,
       subtotal,

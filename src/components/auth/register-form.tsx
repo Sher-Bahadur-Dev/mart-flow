@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { z } from "zod";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RegisterSchema } from "@/lib/validation";
-import { ownerExists } from "@/services/users";
 
 type RegisterValues = z.infer<typeof RegisterSchema>;
 
@@ -22,19 +21,11 @@ export function RegisterForm() {
   const router = useRouter();
   const { signUp, isConfigured, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [ownerAlreadyExists, setOwnerAlreadyExists] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<RegisterValues>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
-
-  useEffect(() => {
-    if (loading || !isConfigured) {
-      return;
-    }
-    void ownerExists().then(setOwnerAlreadyExists);
-  }, [isConfigured, loading]);
 
   return (
     <form
@@ -60,8 +51,11 @@ export function RegisterForm() {
       {!loading && !isConfigured ? (
         <FormAlert message="Firebase is not configured. Add NEXT_PUBLIC_FIREBASE_* keys to .env.local." />
       ) : null}
-      {ownerAlreadyExists ? (
-        <FormAlert message="An owner account already exists. Staff logins are created from Employees." />
+      {isConfigured ? (
+        <FormAlert
+          tone="info"
+          message="Create your owner account to get started with your demo store."
+        />
       ) : null}
       <FormAlert message={error} />
       <div className="space-y-1.5">
@@ -107,7 +101,7 @@ export function RegisterForm() {
         />
         <FieldError>{form.formState.errors.confirmPassword?.message}</FieldError>
       </div>
-      <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || ownerAlreadyExists}>
+      <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || !isConfigured}>
         {form.formState.isSubmitting ? "Creating account…" : "Create owner account"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
