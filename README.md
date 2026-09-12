@@ -1,15 +1,25 @@
-# Mart Flow
+# mart flow
 
 ## Overview
 
-**mart-flow** is a full stack application built using **Next.js and React and TypeScript**.
+mart flow is a dashboard application with pages for (app) cash management, (app) categories, (app) customers, (app) dashboard, (app) employees using AppLayout, CashPage, CategoriesPage, CustomersPage.
+
+mart flow is a dashboard application with pages for (app) cash management, (app) categories, (app) customers, (app) dashboard, (app) employees using AppLayou...
+
+## What the code does
+
+- **Routes found in source:** /(app)/cash-management, /(app)/categories, /(app)/customers, /(app)/dashboard, /(app)/employees, /(app)/expenses, /(app)/grocery, /(app)/inventory, /(app)/notifications, /(app)/pos
+- **Components / views:** AppLayout, CashPage, CategoriesPage, CustomersPage, DashboardPage, EmployeesPage, ExpensesPage, GroceryPage, InventoryPage, NotificationsPage
+- **Source files inspected:** README.md, src/app/(app)/layout.tsx, src/app/(app)/cash-management/page.tsx, src/app/(app)/categories/page.tsx, src/app/(app)/customers/page.tsx, src/app/(app)/dashboard/page.tsx, src/app/(app)/employees/page.tsx, src/app/(app)/expenses/page.tsx
 
 ## Features
 
-- **Authentication & Session Management**: Detected auth dependencies / route handlers.
-- **Database Integration & Persistence**: Integrated with Firebase.
-- **Responsive Interface & Theming**: Modern utility CSS with responsive breakpoints.
-- **Interactive Data Dashboard**: Dashboard views and data visualization.
+- **Dashboard / admin views**: Found dashboard or admin views in source files
+- **Multi-page navigation**: Routes found in code: /(app)/cash-management, /(app)/categories, /(app)/customers, /(app)/dashboard, /(app)/employees, /(app)/expenses
+- **Authentication & Session Management**: Detected auth dependencies / route handlers
+- **Database Integration & Persistence**: Integrated with Firebase
+- **Responsive Interface & Theming**: Modern utility CSS with responsive breakpoints
+- **Interactive Data Dashboard**: Dashboard views and data visualization
 
 ## Tech Stack
 
@@ -39,10 +49,10 @@ README.md            # Project documentation and getting started guide.
 
 ```bash
 # Clone the repository
-git clone https://github.com/Sher-Bahadur-417/mart-flow.git
+git clone https://github.com/Sher-Bahadur-Dev/mart-flow-appcash-management.git
 
 # Navigate into the project folder
-cd mart-flow
+cd mart-flow-appcash-management
 
 # Install dependencies
 npm install
@@ -67,12 +77,6 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_next_public_firebase_measurement_id_her
 ```bash
 npm run dev
 ```
-
-## Screenshots
-
-> *Add screenshots or a GIF demonstration here.*
-
-<!-- ![App Screenshot](path/to/screenshot.png) -->
 
 ## License
 
